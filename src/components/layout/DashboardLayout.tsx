@@ -57,7 +57,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
-        <Link to={role === 'admin' ? '/admin/dashboard' : '/moderator/dashboard'} className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-corporate">
             <QrCode className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -76,13 +76,13 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
-          {/* Sidebar header - hidden on mobile */}
-          <div className="hidden h-16 items-center gap-2 border-b border-border px-6 lg:flex">
+          {/* Sidebar header - hidden on mobile, logo links to scanner */}
+          <Link to="/" className="hidden h-16 items-center gap-2 border-b border-border px-6 lg:flex hover:opacity-90 transition-opacity">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-corporate">
               <QrCode className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="font-heading text-lg font-semibold">QR Attend</span>
-          </div>
+          </Link>
 
           {/* User info */}
           <div className="border-b border-border p-4">

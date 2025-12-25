@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, RefreshCw } from 'lucide-react';
@@ -13,14 +13,37 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
   const [isStarted, setIsStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isStartingRef = useRef(false);
 
-  const startScanner = async () => {
-    if (!containerRef.current) return;
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        const state = scannerRef.current.getState();
+        if (state === 2) { // Html5QrcodeScannerState.SCANNING
+          await scannerRef.current.stop();
+        }
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+      scannerRef.current = null;
+      setIsStarted(false);
+    }
+  }, []);
+
+  const startScanner = useCallback(async () => {
+    if (isStartingRef.current || scannerRef.current) return;
+    isStartingRef.current = true;
 
     try {
       setError(null);
-      const scanner = new Html5Qrcode('qr-reader');
+      
+      // Check if camera is available
+      const devices = await Html5Qrcode.getCameras();
+      if (!devices || devices.length === 0) {
+        throw new Error('No camera found on this device');
+      }
+
+      const scanner = new Html5Qrcode('qr-reader', { verbose: false });
       scannerRef.current = scanner;
 
       await scanner.start(
@@ -34,44 +57,44 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
           onScan(decodedText);
         },
         () => {
-          // Ignore errors during scanning
+          // QR code not found in frame - this is normal
         }
       );
 
       setHasPermission(true);
       setIsStarted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Scanner error:', err);
       setHasPermission(false);
-      setError('Camera access denied. Please allow camera access to scan QR codes.');
-    }
-  };
-
-  const stopScanner = async () => {
-    if (scannerRef.current && isStarted) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current = null;
-        setIsStarted(false);
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
+      
+      if (err.message?.includes('No camera found')) {
+        setError('No camera found on this device.');
+      } else if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
+        setError('Camera access denied. Please allow camera access in your browser settings and try again.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found. Please ensure your device has a camera.');
+      } else if (err.name === 'NotReadableError') {
+        setError('Camera is in use by another application. Please close other apps using the camera.');
+      } else {
+        setError('Could not start camera. Please check your browser permissions and try again.');
       }
+      
+      scannerRef.current = null;
+    } finally {
+      isStartingRef.current = false;
     }
-  };
+  }, [onScan]);
 
   useEffect(() => {
     return () => {
       stopScanner();
     };
-  }, []);
+  }, [stopScanner]);
 
   return (
     <div className="flex flex-col items-center gap-6">
       {/* Scanner container */}
-      <div
-        ref={containerRef}
-        className="relative w-full max-w-sm overflow-hidden rounded-xl border-2 border-primary/20 bg-card shadow-corporate"
-      >
+      <div className="relative w-full max-w-sm overflow-hidden rounded-xl border-2 border-primary/20 bg-card shadow-corporate">
         <div
           id="qr-reader"
           className="aspect-square w-full"

@@ -24,9 +24,9 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        {/* Logo */}
+        {/* Logo - Always goes to scanner */}
         <Link 
-          to={authUser ? getDashboardPath() : '/'} 
+          to="/" 
           className="flex items-center gap-2 text-primary hover:opacity-90 transition-opacity"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-corporate shadow-corporate">

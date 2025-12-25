@@ -9,12 +9,27 @@ export default function ModeratorDashboard() {
   const { authUser } = useAuth();
   const [guestCount, setGuestCount] = useState(0);
 
+  const fetchCount = async () => {
+    const { count } = await supabase.from('guests').select('id', { count: 'exact', head: true });
+    setGuestCount(count || 0);
+  };
+
   useEffect(() => {
-    const fetchCount = async () => {
-      const { count } = await supabase.from('guests').select('id', { count: 'exact', head: true });
-      setGuestCount(count || 0);
-    };
     fetchCount();
+
+    // Subscribe to realtime changes for guests
+    const guestsChannel = supabase
+      .channel('moderator-guests-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'guests' },
+        () => fetchCount()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(guestsChannel);
+    };
   }, []);
 
   return (
