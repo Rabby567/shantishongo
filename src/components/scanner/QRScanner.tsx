@@ -37,29 +37,48 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     try {
       setError(null);
       
-      // Check if camera is available
-      const devices = await Html5Qrcode.getCameras();
-      if (!devices || devices.length === 0) {
-        throw new Error('No camera found on this device');
-      }
-
       const scanner = new Html5Qrcode('qr-reader', { verbose: false });
       scannerRef.current = scanner;
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
-        },
-        (decodedText) => {
-          onScan(decodedText);
-        },
-        () => {
-          // QR code not found in frame - this is normal
+      // Calculate qrbox size based on container width (responsive)
+      const containerWidth = document.getElementById('qr-reader')?.offsetWidth || 300;
+      const qrboxSize = Math.min(containerWidth - 50, 250);
+
+      // Try environment camera first, fall back to any camera
+      try {
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: qrboxSize, height: qrboxSize },
+            disableFlip: false,
+          },
+          (decodedText) => {
+            onScan(decodedText);
+          },
+          () => {}
+        );
+      } catch (envError) {
+        console.log('Environment camera failed, trying any camera:', envError);
+        // Fall back to any available camera
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          await scanner.start(
+            devices[0].id,
+            {
+              fps: 10,
+              qrbox: { width: qrboxSize, height: qrboxSize },
+              disableFlip: false,
+            },
+            (decodedText) => {
+              onScan(decodedText);
+            },
+            () => {}
+          );
+        } else {
+          throw new Error('No camera found on this device');
         }
-      );
+      }
 
       setHasPermission(true);
       setIsStarted(true);
