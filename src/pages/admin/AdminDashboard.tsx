@@ -7,26 +7,71 @@ import { supabase } from '@/integrations/supabase/client';
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ guests: 0, todayScans: 0, moderators: 0, pending: 0 });
 
+  const fetchStats = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [guests, attendance, moderators, pending] = await Promise.all([
+      supabase.from('guests').select('id', { count: 'exact', head: true }),
+      supabase.from('attendance').select('id', { count: 'exact', head: true }).gte('scanned_at', today.toISOString()),
+      supabase.from('user_roles').select('id', { count: 'exact', head: true }).eq('role', 'moderator'),
+      supabase.from('moderator_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    ]);
+
+    setStats({
+      guests: guests.count || 0,
+      todayScans: attendance.count || 0,
+      moderators: moderators.count || 0,
+      pending: pending.count || 0,
+    });
+  };
+
   useEffect(() => {
-    const fetchStats = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const [guests, attendance, moderators, pending] = await Promise.all([
-        supabase.from('guests').select('id', { count: 'exact', head: true }),
-        supabase.from('attendance').select('id', { count: 'exact', head: true }).gte('scanned_at', today.toISOString()),
-        supabase.from('user_roles').select('id', { count: 'exact', head: true }).eq('role', 'moderator'),
-        supabase.from('moderator_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      ]);
-
-      setStats({
-        guests: guests.count || 0,
-        todayScans: attendance.count || 0,
-        moderators: moderators.count || 0,
-        pending: pending.count || 0,
-      });
-    };
     fetchStats();
+
+    // Subscribe to realtime changes
+    const attendanceChannel = supabase
+      .channel('admin-attendance-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'attendance' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    const guestsChannel = supabase
+      .channel('admin-guests-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'guests' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    const approvalsChannel = supabase
+      .channel('admin-approvals-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'moderator_approvals' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    const rolesChannel = supabase
+      .channel('admin-roles-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_roles' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(attendanceChannel);
+      supabase.removeChannel(guestsChannel);
+      supabase.removeChannel(approvalsChannel);
+      supabase.removeChannel(rolesChannel);
+    };
   }, []);
 
   const cards = [
