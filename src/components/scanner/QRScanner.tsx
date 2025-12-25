@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, CameraDevice } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
-import { Camera, CameraOff, RefreshCw } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw, SwitchCamera } from 'lucide-react';
 
 interface QRScannerProps {
   onScan: (result: string) => void;
@@ -12,6 +12,8 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isStarted, setIsStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStartingRef = useRef(false);
 
@@ -30,7 +32,7 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     }
   }, []);
 
-  const startScanner = useCallback(async () => {
+  const startScanner = useCallback(async (cameraId?: string) => {
     if (isStartingRef.current || scannerRef.current) return;
     isStartingRef.current = true;
 
@@ -40,43 +42,39 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       const scanner = new Html5Qrcode('qr-reader', { verbose: false });
       scannerRef.current = scanner;
 
+      // Get available cameras
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        setCameras(devices);
+      }
+
       // Calculate qrbox size based on container width (responsive)
       const containerWidth = document.getElementById('qr-reader')?.offsetWidth || 300;
       const qrboxSize = Math.min(containerWidth - 50, 250);
 
-      // Try environment camera first, fall back to any camera
-      try {
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: qrboxSize, height: qrboxSize },
-            disableFlip: false,
-          },
-          (decodedText) => {
-            onScan(decodedText);
-          },
-          () => {}
-        );
-      } catch (envError) {
-        console.log('Environment camera failed, trying any camera:', envError);
-        // Fall back to any available camera
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          await scanner.start(
-            devices[0].id,
-            {
-              fps: 10,
-              qrbox: { width: qrboxSize, height: qrboxSize },
-              disableFlip: false,
-            },
-            (decodedText) => {
-              onScan(decodedText);
-            },
-            () => {}
-          );
-        } else {
-          throw new Error('No camera found on this device');
+      const config = {
+        fps: 10,
+        qrbox: { width: qrboxSize, height: qrboxSize },
+        disableFlip: false,
+      };
+
+      // Use provided camera ID, or try environment camera, or fall back to first available
+      if (cameraId) {
+        await scanner.start(cameraId, config, (decodedText) => onScan(decodedText), () => {});
+      } else {
+        try {
+          await scanner.start({ facingMode: 'environment' }, config, (decodedText) => onScan(decodedText), () => {});
+          // Find index of environment camera
+          const envIndex = devices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear'));
+          if (envIndex >= 0) setCurrentCameraIndex(envIndex);
+        } catch (envError) {
+          console.log('Environment camera failed, trying first camera:', envError);
+          if (devices && devices.length > 0) {
+            await scanner.start(devices[0].id, config, (decodedText) => onScan(decodedText), () => {});
+            setCurrentCameraIndex(0);
+          } else {
+            throw new Error('No camera found on this device');
+          }
         }
       }
 
@@ -104,6 +102,21 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     }
   }, [onScan]);
 
+  const switchCamera = useCallback(async () => {
+    if (cameras.length < 2) return;
+    
+    const nextIndex = (currentCameraIndex + 1) % cameras.length;
+    const nextCamera = cameras[nextIndex];
+    
+    await stopScanner();
+    setCurrentCameraIndex(nextIndex);
+    
+    // Small delay to ensure cleanup
+    setTimeout(() => {
+      startScanner(nextCamera.id);
+    }, 100);
+  }, [cameras, currentCameraIndex, stopScanner, startScanner]);
+
   useEffect(() => {
     return () => {
       stopScanner();
@@ -126,7 +139,7 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
               <>
                 <CameraOff className="h-16 w-16 text-muted-foreground" />
                 <p className="text-center text-sm text-muted-foreground">{error}</p>
-                <Button onClick={startScanner} className="gap-2">
+                <Button onClick={() => startScanner()} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   Try Again
                 </Button>
@@ -137,7 +150,7 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
                 <p className="text-center text-sm text-muted-foreground">
                   Click the button below to start scanning
                 </p>
-                <Button onClick={startScanner} className="gap-2" disabled={isScanning}>
+                <Button onClick={() => startScanner()} className="gap-2" disabled={isScanning}>
                   <Camera className="h-4 w-4" />
                   Start Camera
                 </Button>
@@ -158,10 +171,18 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
 
       {/* Controls */}
       {isStarted && (
-        <Button variant="outline" onClick={stopScanner} className="gap-2">
-          <CameraOff className="h-4 w-4" />
-          Stop Camera
-        </Button>
+        <div className="flex gap-2">
+          {cameras.length > 1 && (
+            <Button variant="outline" onClick={switchCamera} className="gap-2">
+              <SwitchCamera className="h-4 w-4" />
+              Switch Camera
+            </Button>
+          )}
+          <Button variant="outline" onClick={stopScanner} className="gap-2">
+            <CameraOff className="h-4 w-4" />
+            Stop Camera
+          </Button>
+        </div>
       )}
 
       {/* Instructions */}
