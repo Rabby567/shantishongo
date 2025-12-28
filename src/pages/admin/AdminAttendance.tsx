@@ -67,7 +67,19 @@ export default function AdminAttendance() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchAttendance(); }, [dateFilter]);
+  useEffect(() => {
+    fetchAttendance();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('admin-attendance-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => fetchAttendance())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [dateFilter]);
 
   const deleteAttendance = async (id: string) => {
     const { error } = await supabase.from('attendance').delete().eq('id', id);

@@ -70,7 +70,21 @@ export default function AdminModerators() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchModerators(); }, []);
+  useEffect(() => {
+    fetchModerators();
+
+    // Subscribe to realtime changes for moderator updates
+    const channel = supabase
+      .channel('admin-moderators-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, () => fetchModerators())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moderator_approvals' }, () => fetchModerators())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchModerators())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const updateStatus = async (userId: string, status: 'approved' | 'rejected') => {
     setActionLoading(userId);
