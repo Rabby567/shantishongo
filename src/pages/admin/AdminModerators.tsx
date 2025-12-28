@@ -83,16 +83,36 @@ export default function AdminModerators() {
 
   const updateStatus = async (userId: string, status: 'approved' | 'rejected') => {
     setActionLoading(userId);
+    
+    // Update approval status
     const { error } = await supabase
       .from('moderator_approvals')
       .update({ status, reviewed_at: new Date().toISOString() })
       .eq('user_id', userId);
 
-    if (error) toast.error('Failed to update status');
-    else {
-      toast.success(`Moderator ${status}`);
-      fetchModerators();
+    if (error) {
+      toast.error('Failed to update status');
+      setActionLoading(null);
+      return;
     }
+
+    // If approving, ensure the user has the moderator role
+    if (status === 'approved') {
+      // Check if role already exists
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('role', 'moderator')
+        .maybeSingle();
+
+      if (!existingRole) {
+        await supabase.from('user_roles').insert({ user_id: userId, role: 'moderator' });
+      }
+    }
+
+    toast.success(`Moderator ${status}`);
+    fetchModerators();
     setActionLoading(null);
   };
 

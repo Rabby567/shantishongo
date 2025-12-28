@@ -89,7 +89,7 @@ export default function ModeratorLogin() {
         toast.error('Your moderator application was rejected.');
       } else {
         toast.success('Welcome back!');
-        navigate('/');
+        navigate('/moderator/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
