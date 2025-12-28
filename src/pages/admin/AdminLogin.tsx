@@ -63,7 +63,7 @@ export default function AdminLogin() {
       }
 
       toast.success('Welcome back, Admin!');
-      navigate('/admin/dashboard');
+      navigate('/');
     } catch (error) {
       console.error('Login error:', error);
       toast.error('An unexpected error occurred');
