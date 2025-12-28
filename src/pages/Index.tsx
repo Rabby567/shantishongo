@@ -4,16 +4,19 @@ import { QRScanner } from '@/components/scanner/QRScanner';
 import { ScanResultModal, ScanStatus, GuestData } from '@/components/scanner/ScanResultModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Keyboard, Scan } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
   const [scanStatus, setScanStatus] = useState<ScanStatus>(null);
   const [guestData, setGuestData] = useState<GuestData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [manualId, setManualId] = useState('');
+  const [isManualLoading, setIsManualLoading] = useState(false);
 
-  const handleScan = async (qrCode: string) => {
-    if (isScanning) return;
-    setIsScanning(true);
-
+  const processGuestCode = async (qrCode: string) => {
     try {
       const { data: guest, error: guestError } = await supabase
         .from('guests')
@@ -23,7 +26,6 @@ const Index = () => {
 
       if (guestError) {
         toast.error('Error looking up guest');
-        setIsScanning(false);
         return;
       }
 
@@ -75,6 +77,26 @@ const Index = () => {
     }
   };
 
+  const handleScan = async (qrCode: string) => {
+    if (isScanning) return;
+    setIsScanning(true);
+    await processGuestCode(qrCode);
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedId = manualId.trim();
+    if (!trimmedId) {
+      toast.error('Please enter a guest ID');
+      return;
+    }
+    setIsManualLoading(true);
+    setIsScanning(true);
+    await processGuestCode(trimmedId);
+    setManualId('');
+    setIsManualLoading(false);
+  };
+
   const handleCloseModal = () => {
     setScanStatus(null);
     setIsScanning(false);
@@ -91,10 +113,57 @@ const Index = () => {
               QR Code Scanner
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Scan guest QR codes to record attendance
+              Scan guest QR codes or enter ID manually to record attendance
             </p>
           </div>
-          <QRScanner onScan={handleScan} isScanning={isScanning} />
+          
+          <Tabs defaultValue="scan" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="scan" className="gap-2">
+                <Scan className="h-4 w-4" />
+                Scan QR
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="gap-2">
+                <Keyboard className="h-4 w-4" />
+                Manual Entry
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="scan">
+              <QRScanner onScan={handleScan} isScanning={isScanning} />
+            </TabsContent>
+            
+            <TabsContent value="manual">
+              <div className="rounded-xl border-2 border-primary/20 bg-card p-6 shadow-corporate">
+                <form onSubmit={handleManualSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="guestId" className="text-sm font-medium text-foreground">
+                      Guest ID
+                    </label>
+                    <Input
+                      id="guestId"
+                      type="text"
+                      placeholder="Enter guest ID (e.g., G-123456)"
+                      value={manualId}
+                      onChange={(e) => setManualId(e.target.value)}
+                      disabled={isManualLoading}
+                      className="text-lg"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the guest ID code printed on their QR badge
+                    </p>
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isManualLoading || !manualId.trim()}
+                  >
+                    {isManualLoading ? 'Processing...' : 'Check In Guest'}
+                  </Button>
+                </form>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       <ScanResultModal 
