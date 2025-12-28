@@ -36,7 +36,19 @@ export default function ModeratorGuests() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchGuests(); }, []);
+  useEffect(() => {
+    fetchGuests();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('moderator-guests-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guests' }, () => fetchGuests())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const filteredGuests = guests.filter(g => 
     g.name.toLowerCase().includes(search.toLowerCase()) || 
