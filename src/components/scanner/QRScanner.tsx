@@ -72,6 +72,31 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       };
 
       const onScanSuccess = (decodedText: string) => {
+        // Haptic feedback
+        if ('vibrate' in navigator) {
+          navigator.vibrate([100, 50, 100]);
+        }
+        
+        // Play success sound
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 880;
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (err) {
+          console.log('Audio feedback not available');
+        }
+        
         onScan(decodedText);
       };
 
