@@ -17,6 +17,17 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastScannedRef = useRef<string | null>(null);
+  const isScanningRef = useRef(isScanning);
+  
+  // Keep the ref in sync with the prop
+  useEffect(() => {
+    isScanningRef.current = isScanning;
+    // Reset the last scanned code when scanning completes (modal closed)
+    if (!isScanning) {
+      lastScannedRef.current = null;
+    }
+  }, [isScanning]);
   const mountedRef = useRef(true);
 
   const stopScanner = useCallback(async () => {
@@ -123,6 +134,14 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       };
 
       const onScanSuccess = (decodedText: string) => {
+        // Prevent duplicate scans - check if we're already processing or same QR code
+        if (isScanningRef.current || lastScannedRef.current === decodedText) {
+          return;
+        }
+        
+        // Mark this code as scanned to prevent rapid re-scans
+        lastScannedRef.current = decodedText;
+        
         // Haptic feedback
         if ('vibrate' in navigator) {
           navigator.vibrate([100, 50, 100]);
