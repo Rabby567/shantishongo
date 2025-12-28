@@ -33,14 +33,15 @@ const Index = () => {
         return;
       }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
       
+      // Check if already scanned today
       const { data: existingAttendance } = await supabase
         .from('attendance')
         .select('id')
         .eq('guest_id', guest.id)
-        .gte('scanned_at', today.toISOString())
+        .eq('scan_date', today)
         .maybeSingle();
 
       setGuestData({
@@ -52,8 +53,21 @@ const Index = () => {
       if (existingAttendance) {
         setScanStatus('already_scanned');
       } else {
-        await supabase.from('attendance').insert({ guest_id: guest.id });
-        setScanStatus('success');
+        // Insert with scan_date to ensure uniqueness at DB level
+        const { error: insertError } = await supabase
+          .from('attendance')
+          .insert({ guest_id: guest.id, scan_date: today });
+        
+        if (insertError) {
+          // If duplicate key error, they were already scanned
+          if (insertError.code === '23505') {
+            setScanStatus('already_scanned');
+          } else {
+            throw insertError;
+          }
+        } else {
+          setScanStatus('success');
+        }
       }
     } catch (error) {
       console.error('Scan error:', error);
