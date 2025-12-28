@@ -1,7 +1,8 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { Users, CalendarCheck } from 'lucide-react';
+import { Users, CalendarCheck, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -18,7 +19,7 @@ interface AttendanceRecord {
   id: string;
   scan_date: string;
   scanned_at: string;
-  guest: { name: string; phone: string | null } | null;
+  guest: { name: string; phone: string | null; image_url: string | null } | null;
 }
 
 export default function ModeratorDashboard() {
@@ -35,7 +36,7 @@ export default function ModeratorDashboard() {
     // Fetch attendance records with guest info
     const { data: attendance } = await supabase
       .from('attendance')
-      .select('id, scan_date, scanned_at, guest:guests(name, phone)')
+      .select('id, scan_date, scanned_at, guest:guests(name, phone, image_url)')
       .order('scanned_at', { ascending: false })
       .limit(50);
     
@@ -112,7 +113,17 @@ export default function ModeratorDashboard() {
               ) : (
                 attendanceRecords.map((record) => (
                   <TableRow key={record.id}>
-                    <TableCell className="font-medium">{record.guest?.name || 'Unknown'}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={record.guest?.image_url || undefined} alt={record.guest?.name || 'Guest'} />
+                          <AvatarFallback>
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{record.guest?.name || 'Unknown'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{record.guest?.phone || '-'}</TableCell>
                     <TableCell>{format(new Date(record.scan_date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>{format(new Date(record.scanned_at), 'h:mm a')}</TableCell>
