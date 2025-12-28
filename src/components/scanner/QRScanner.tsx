@@ -19,15 +19,6 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScannedRef = useRef<string | null>(null);
   const isScanningRef = useRef(isScanning);
-  
-  // Keep the ref in sync with the prop
-  useEffect(() => {
-    isScanningRef.current = isScanning;
-    // Reset the last scanned code when scanning completes (modal closed)
-    if (!isScanning) {
-      lastScannedRef.current = null;
-    }
-  }, [isScanning]);
   const mountedRef = useRef(true);
 
   const stopScanner = useCallback(async () => {
@@ -134,21 +125,23 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       };
 
       const onScanSuccess = async (decodedText: string) => {
-        // Prevent duplicate scans - check if we're already processing or same QR code
-        if (isScanningRef.current || lastScannedRef.current === decodedText) {
+        // Prevent duplicate scans - check if we're already processing
+        if (isScanningRef.current) {
           return;
         }
         
-        // Mark this code as scanned to prevent rapid re-scans
-        lastScannedRef.current = decodedText;
+        // Mark as scanning immediately to prevent ANY further scans
         isScanningRef.current = true;
+        lastScannedRef.current = decodedText;
         
-        // Stop scanner immediately after successful scan
-        if (scannerRef.current) {
+        // Stop scanner IMMEDIATELY - no async/await to prevent race conditions
+        const scanner = scannerRef.current;
+        if (scanner) {
+          scannerRef.current = null;
           try {
-            const state = scannerRef.current.getState();
+            const state = scanner.getState();
             if (state === 2) {
-              await scannerRef.current.stop();
+              scanner.stop().catch(console.error);
             }
           } catch (err) {
             console.error('Error stopping scanner after scan:', err);
@@ -312,6 +305,22 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       startScanner(nextCamera.id);
     }, 300);
   }, [cameras, currentCameraIndex, stopScanner, startScanner, isLoading]);
+
+  // Keep the ref in sync with the prop and restart scanner when modal closes
+  useEffect(() => {
+    isScanningRef.current = isScanning;
+    // Reset and restart scanner when scanning completes (modal closed)
+    if (!isScanning && lastScannedRef.current !== null) {
+      lastScannedRef.current = null;
+      // Restart scanner after modal closes
+      const timer = setTimeout(() => {
+        if (mountedRef.current && !scannerRef.current) {
+          startScanner();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isScanning, startScanner]);
 
   useEffect(() => {
     mountedRef.current = true;
