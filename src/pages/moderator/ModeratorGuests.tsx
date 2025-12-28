@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { generateQRCodeWithImage, downloadQRCode } from '@/lib/qrcode';
 import { toast } from 'sonner';
@@ -19,27 +27,65 @@ interface Guest {
   qr_code: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function ModeratorGuests() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const fetchGuests = async () => {
-    const { data, error } = await supabase.from('guests').select('*').order('created_at', { ascending: false });
-    if (error) toast.error('Failed to load guests');
-    else setGuests(data || []);
-    setLoading(false);
-  };
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchGuests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('guests')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (debouncedSearch.trim()) {
+        query = query.or(`name.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%,qr_code.ilike.%${debouncedSearch}%`);
+      }
+
+      const { data, error, count } = await query.range(from, to);
+
+      if (error) throw error;
+      setGuests(data || []);
+      setTotalCount(count || 0);
+    } catch (error) {
+      toast.error('Failed to load guests');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, debouncedSearch]);
 
   useEffect(() => {
     fetchGuests();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel('moderator-guests-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guests' }, () => fetchGuests())
@@ -48,13 +94,7 @@ export default function ModeratorGuests() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
-
-  const filteredGuests = guests.filter(g => 
-    g.name.toLowerCase().includes(search.toLowerCase()) || 
-    g.phone?.includes(search) ||
-    g.qr_code.toLowerCase().includes(search.toLowerCase())
-  );
+  }, [fetchGuests]);
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
@@ -92,7 +132,6 @@ export default function ModeratorGuests() {
       setDialogOpen(false);
       setFormData({ name: '', phone: '' });
       setImageFile(null);
-      fetchGuests();
     }
     setSaving(false);
   };
@@ -107,10 +146,32 @@ export default function ModeratorGuests() {
     setDownloadingId(null);
   };
 
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+    return pages;
+  };
+
+  const startIndex = totalCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(currentPage * PAGE_SIZE, totalCount);
+
   return (
     <DashboardLayout role="moderator">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <h1 className="font-heading text-2xl font-bold">Guest List</h1>
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Guest List</h1>
+          <p className="text-sm text-muted-foreground">{totalCount} guest{totalCount !== 1 ? 's' : ''} total</p>
+        </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2"><Plus className="h-4 w-4" />Add Guest</Button>
       </div>
 
@@ -134,9 +195,9 @@ export default function ModeratorGuests() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
-            ) : filteredGuests.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No guests found</TableCell></TableRow>
-            ) : filteredGuests.map((guest) => (
+            ) : guests.length === 0 ? (
+              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">{debouncedSearch ? 'No guests found matching your search' : 'No guests found'}</TableCell></TableRow>
+            ) : guests.map((guest) => (
               <TableRow key={guest.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -159,6 +220,46 @@ export default function ModeratorGuests() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {startIndex}-{endIndex} of {totalCount} guests
+          </p>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              {getPageNumbers().map((page, i) => (
+                <PaginationItem key={i}>
+                  {page === '...' ? (
+                    <span className="px-3 py-2">...</span>
+                  ) : (
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page as number)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
