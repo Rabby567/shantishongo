@@ -37,16 +37,22 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     }
   }, []);
 
-  const requestCameraPermission = async (): Promise<boolean> => {
+  const requestCameraPermission = async (): Promise<MediaStream | null> => {
     try {
+      // Try back camera first
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { facingMode: { ideal: 'environment' } } 
       });
-      stream.getTracks().forEach(track => track.stop());
-      return true;
+      return stream;
     } catch (err) {
-      console.error('Permission request failed:', err);
-      return false;
+      // Try any camera
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        return stream;
+      } catch (fallbackErr) {
+        console.error('Permission request failed:', fallbackErr);
+        return null;
+      }
     }
   };
 
@@ -58,20 +64,23 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     setIsLoading(true);
     setError(null);
 
+    let permissionStream: MediaStream | null = null;
+
     try {
-      // First, explicitly request camera permission on mobile
-      const hasAccess = await requestCameraPermission();
-      if (!hasAccess) {
+      // First, explicitly request camera permission
+      permissionStream = await requestCameraPermission();
+      if (!permissionStream) {
         throw new Error('Camera permission denied');
       }
 
-      // Small delay for mobile browsers to release the camera
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) {
+        permissionStream.getTracks().forEach(track => track.stop());
+        return;
+      }
 
       const container = document.getElementById('qr-reader');
       if (!container) {
+        permissionStream.getTracks().forEach(track => track.stop());
         setError('Scanner container not found. Please refresh the page.');
         setIsLoading(false);
         return;
@@ -80,6 +89,15 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
       // Clear the container
       container.innerHTML = '';
       
+      // Stop the permission stream BEFORE creating Html5Qrcode
+      permissionStream.getTracks().forEach(track => track.stop());
+      permissionStream = null;
+      
+      // Wait for Chrome to fully release the camera
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!mountedRef.current) return;
+
       const scanner = new Html5Qrcode('qr-reader', { verbose: false });
       scannerRef.current = scanner;
 
