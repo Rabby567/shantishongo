@@ -15,11 +15,7 @@ export async function generateQRCodeWithImage(
     errorCorrectionLevel: 'H', // High error correction to accommodate center image
   });
 
-  if (!imageUrl) {
-    return qrDataUrl;
-  }
-
-  // Create canvas to overlay image
+  // Create canvas to add image and ID text
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -32,9 +28,29 @@ export async function generateQRCodeWithImage(
     qrImg.crossOrigin = 'anonymous';
     
     qrImg.onload = () => {
+      // Add extra height for the ID text at the bottom
+      const textHeight = 40;
       canvas.width = qrImg.width;
-      canvas.height = qrImg.height;
+      canvas.height = qrImg.height + textHeight;
+      
+      // Fill background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw QR code
       ctx.drawImage(qrImg, 0, 0);
+      
+      // Draw ID text at the bottom
+      ctx.fillStyle = '#1e3a5f';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`ID: ${data}`, canvas.width / 2, qrImg.height + textHeight / 2);
+
+      if (!imageUrl) {
+        resolve(canvas.toDataURL('image/png'));
+        return;
+      }
 
       // Load guest image
       const guestImg = new Image();
@@ -71,8 +87,8 @@ export async function generateQRCodeWithImage(
       };
 
       guestImg.onerror = () => {
-        // If guest image fails to load, just return QR without image
-        resolve(qrDataUrl);
+        // If guest image fails to load, just return QR with ID text
+        resolve(canvas.toDataURL('image/png'));
       };
 
       guestImg.src = imageUrl;
