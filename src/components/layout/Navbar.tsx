@@ -43,6 +43,17 @@ export function Navbar() {
             <div className="h-9 w-20 animate-pulse rounded-md bg-muted" />
           ) : authUser ? (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="gap-2"
+              >
+                <Link to={getDashboardPath()}>
+                  {authUser.role === 'admin' ? <Shield className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Link>
+              </Button>
               <span className="hidden text-sm text-muted-foreground sm:block">
                 {authUser.email}
               </span>
