@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { QRScanner } from '@/components/scanner/QRScanner';
-import { ScanResultModal, ScanStatus } from '@/components/scanner/ScanResultModal';
+import { ScanResultModal, ScanStatus, GuestData } from '@/components/scanner/ScanResultModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const Index = () => {
   const [scanStatus, setScanStatus] = useState<ScanStatus>(null);
-  const [guestName, setGuestName] = useState<string>('');
+  const [guestData, setGuestData] = useState<GuestData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
   const handleScan = async (qrCode: string) => {
@@ -17,7 +17,7 @@ const Index = () => {
     try {
       const { data: guest, error: guestError } = await supabase
         .from('guests')
-        .select('id, name')
+        .select('id, name, qr_code, image_url')
         .eq('qr_code', qrCode)
         .maybeSingle();
 
@@ -28,9 +28,8 @@ const Index = () => {
       }
 
       if (!guest) {
-        setGuestName('');
+        setGuestData(null);
         setScanStatus('not_found');
-        setIsScanning(false);
         return;
       }
 
@@ -44,7 +43,11 @@ const Index = () => {
         .gte('scanned_at', today.toISOString())
         .maybeSingle();
 
-      setGuestName(guest.name);
+      setGuestData({
+        name: guest.name,
+        qr_code: guest.qr_code,
+        image_url: guest.image_url,
+      });
 
       if (existingAttendance) {
         setScanStatus('already_scanned');
@@ -56,7 +59,12 @@ const Index = () => {
       console.error('Scan error:', error);
       toast.error('An error occurred while scanning');
     }
+  };
+
+  const handleCloseModal = () => {
+    setScanStatus(null);
     setIsScanning(false);
+    setGuestData(null);
   };
 
   return (
@@ -77,8 +85,8 @@ const Index = () => {
       </main>
       <ScanResultModal 
         status={scanStatus} 
-        guestName={guestName} 
-        onClose={() => setScanStatus(null)} 
+        guest={guestData} 
+        onClose={handleCloseModal} 
       />
     </div>
   );
