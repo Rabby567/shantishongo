@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, ClipboardList, UserCog, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ guests: 0, todayScans: 0, moderators: 0, pending: 0 });
+  const navigate = useNavigate();
 
   const fetchStats = async () => {
     const today = new Date();
@@ -75,10 +77,10 @@ export default function AdminDashboard() {
   }, []);
 
   const cards = [
-    { title: 'Total Guests', value: stats.guests, icon: Users, color: 'text-primary' },
-    { title: 'Scans Today', value: stats.todayScans, icon: ClipboardList, color: 'text-success' },
-    { title: 'Moderators', value: stats.moderators, icon: UserCog, color: 'text-accent' },
-    { title: 'Pending Approvals', value: stats.pending, icon: Clock, color: 'text-warning' },
+    { title: 'Total Guests', value: stats.guests, icon: Users, color: 'text-primary', link: '/admin/guests' },
+    { title: 'Scans Today', value: stats.todayScans, icon: ClipboardList, color: 'text-success', link: '/admin/attendance' },
+    { title: 'Moderators', value: stats.moderators, icon: UserCog, color: 'text-accent', link: '/admin/moderators' },
+    { title: 'Pending Approvals', value: stats.pending, icon: Clock, color: 'text-warning', link: '/admin/moderators' },
   ];
 
   return (
@@ -86,7 +88,11 @@ export default function AdminDashboard() {
       <h1 className="font-heading text-2xl font-bold mb-6">Dashboard Overview</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <Card key={card.title} className="shadow-corporate">
+          <Card 
+            key={card.title} 
+            className="shadow-corporate cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate(card.link)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
               <card.icon className={`h-5 w-5 ${card.color}`} />
