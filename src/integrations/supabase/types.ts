@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           guest_id: string
           id: string
+          scan_date: string
           scanned_at: string
           scanned_by: string | null
         }
         Insert: {
           guest_id: string
           id?: string
+          scan_date?: string
           scanned_at?: string
           scanned_by?: string | null
         }
         Update: {
           guest_id?: string
           id?: string
+          scan_date?: string
           scanned_at?: string
           scanned_by?: string | null
         }
