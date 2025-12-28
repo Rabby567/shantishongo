@@ -24,24 +24,25 @@ export default function AdminModerators() {
   const [resetDialog, setResetDialog] = useState<{ open: boolean; moderator: Moderator | null; newPassword?: string }>({ open: false, moderator: null });
 
   const fetchModerators = async () => {
-    // Get all users with moderator role
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'moderator');
+    // Get all moderator approval requests (this includes pending users who don't have the role yet)
+    const { data: approvals, error: approvalsError } = await supabase
+      .from('moderator_approvals')
+      .select('user_id, status, created_at')
+      .order('created_at', { ascending: false });
 
-    if (rolesError) {
-      toast.error('Failed to load moderators');
+    if (approvalsError) {
+      toast.error('Failed to load moderator requests');
       setLoading(false);
       return;
     }
 
-    const userIds = roles?.map(r => r.user_id) || [];
-    if (userIds.length === 0) {
+    if (!approvals || approvals.length === 0) {
       setModerators([]);
       setLoading(false);
       return;
     }
+
+    const userIds = approvals.map(a => a.user_id);
 
     // Get profiles for these users
     const { data: profiles } = await supabase
@@ -49,20 +50,14 @@ export default function AdminModerators() {
       .select('id, email, full_name')
       .in('id', userIds);
 
-    // Get approval status
-    const { data: approvals } = await supabase
-      .from('moderator_approvals')
-      .select('user_id, status, created_at')
-      .in('user_id', userIds);
-
-    const moderatorList: Moderator[] = (profiles || []).map(profile => {
-      const approval = approvals?.find(a => a.user_id === profile.id);
+    const moderatorList: Moderator[] = approvals.map(approval => {
+      const profile = profiles?.find(p => p.id === approval.user_id);
       return {
-        user_id: profile.id,
-        email: profile.email,
-        full_name: profile.full_name,
-        status: (approval?.status as 'pending' | 'approved' | 'rejected') || 'pending',
-        created_at: approval?.created_at || '',
+        user_id: approval.user_id,
+        email: profile?.email || 'Unknown',
+        full_name: profile?.full_name || null,
+        status: approval.status as 'pending' | 'approved' | 'rejected',
+        created_at: approval.created_at,
       };
     });
 
