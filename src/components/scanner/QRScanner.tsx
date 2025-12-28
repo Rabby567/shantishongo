@@ -289,21 +289,70 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
     };
   }, [stopScanner]);
 
+  // Force video element to display properly on mobile
+  useEffect(() => {
+    if (isStarted) {
+      const fixVideoDisplay = () => {
+        const container = document.getElementById('qr-reader');
+        if (container) {
+          const video = container.querySelector('video');
+          if (video) {
+            video.style.cssText = `
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: cover !important;
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+            `;
+          }
+          // Also fix the internal container
+          const innerContainer = container.querySelector('#qr-shaded-region');
+          if (innerContainer) {
+            (innerContainer as HTMLElement).style.cssText = `
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: 100% !important;
+            `;
+          }
+        }
+      };
+      
+      // Run immediately and after a delay for late-loading elements
+      fixVideoDisplay();
+      const timer1 = setTimeout(fixVideoDisplay, 100);
+      const timer2 = setTimeout(fixVideoDisplay, 500);
+      const timer3 = setTimeout(fixVideoDisplay, 1000);
+      
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+      };
+    }
+  }, [isStarted]);
+
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="relative w-full max-w-sm overflow-hidden rounded-xl border-2 border-primary/20 bg-card shadow-corporate">
         <div
           id="qr-reader"
           ref={containerRef}
-          className="aspect-square w-full"
           style={{ 
             display: isStarted ? 'block' : 'none',
-            minHeight: '300px'
+            width: '100%',
+            height: '300px',
+            position: 'relative',
+            overflow: 'hidden',
+            background: '#000'
           }}
         />
 
         {!isStarted && (
-          <div className="flex aspect-square w-full flex-col items-center justify-center gap-4 bg-muted/50 p-8" style={{ minHeight: '300px' }}>
+          <div className="flex w-full flex-col items-center justify-center gap-4 bg-muted/50 p-8" style={{ height: '300px' }}>
             {isLoading ? (
               <>
                 <Loader2 className="h-16 w-16 text-primary animate-spin" />
@@ -336,7 +385,7 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
         )}
 
         {isStarted && (
-          <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 pointer-events-none z-10">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-48 w-48 border-2 border-primary rounded-lg animate-pulse" />
             </div>
