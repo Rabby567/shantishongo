@@ -133,7 +133,7 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
         disableFlip: false,
       };
 
-      const onScanSuccess = (decodedText: string) => {
+      const onScanSuccess = async (decodedText: string) => {
         // Prevent duplicate scans - check if we're already processing or same QR code
         if (isScanningRef.current || lastScannedRef.current === decodedText) {
           return;
@@ -141,6 +141,19 @@ export function QRScanner({ onScan, isScanning }: QRScannerProps) {
         
         // Mark this code as scanned to prevent rapid re-scans
         lastScannedRef.current = decodedText;
+        isScanningRef.current = true;
+        
+        // Stop scanner immediately after successful scan
+        if (scannerRef.current) {
+          try {
+            const state = scannerRef.current.getState();
+            if (state === 2) {
+              await scannerRef.current.stop();
+            }
+          } catch (err) {
+            console.error('Error stopping scanner after scan:', err);
+          }
+        }
         
         // Haptic feedback
         if ('vibrate' in navigator) {
