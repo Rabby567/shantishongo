@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -14,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  User,
 } from 'lucide-react';
 
 interface NavItem {
@@ -87,8 +89,18 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
 
           {/* User info */}
           <div className="border-b border-border p-4">
-            <div className="text-sm font-medium text-foreground">{authUser?.fullName || authUser?.email}</div>
-            <div className="text-xs text-muted-foreground capitalize">{role}</div>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={authUser?.avatarUrl || undefined} alt={authUser?.fullName || 'User'} />
+                <AvatarFallback>
+                  <User className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="text-sm font-medium text-foreground">{authUser?.fullName || authUser?.email}</div>
+                <div className="text-xs text-muted-foreground capitalize">{role}</div>
+              </div>
+            </div>
           </div>
 
           {/* Navigation */}
