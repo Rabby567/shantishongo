@@ -11,12 +11,47 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [scanStatus, setScanStatus] = useState<ScanStatus>(null);
   const [guestData, setGuestData] = useState<GuestData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [manualId, setManualId] = useState('');
   const [isManualLoading, setIsManualLoading] = useState(false);
+
+  // Require authentication to scan
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <div className="mx-auto max-w-lg text-center">
+            <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl mb-4">
+              QR Code Scanner
+            </h1>
+            <p className="text-muted-foreground mb-6">
+              Please log in as a moderator or admin to scan guest QR codes.
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Button onClick={() => window.location.href = '/moderator/login'}>
+                Moderator Login
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/admin/login'}>
+                Admin Login
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const processGuestCode = async (qrCode: string) => {
     try {
