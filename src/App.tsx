@@ -16,6 +16,7 @@ import ModeratorLogin from "./pages/moderator/ModeratorLogin";
 import ModeratorDashboard from "./pages/moderator/ModeratorDashboard";
 import ModeratorGuests from "./pages/moderator/ModeratorGuests";
 import ModeratorPending from "./pages/moderator/ModeratorPending";
+import ModeratorProfile from "./pages/moderator/ModeratorProfile";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/moderator/pending" element={<ModeratorPending />} />
             <Route path="/moderator/dashboard" element={<ProtectedRoute requiredRole="moderator"><ModeratorDashboard /></ProtectedRoute>} />
             <Route path="/moderator/guests" element={<ProtectedRoute requiredRole="moderator"><ModeratorGuests /></ProtectedRoute>} />
+            <Route path="/moderator/profile" element={<ProtectedRoute requiredRole="moderator"><ModeratorProfile /></ProtectedRoute>} />
             
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

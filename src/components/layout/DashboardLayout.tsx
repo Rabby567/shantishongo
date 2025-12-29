@@ -37,6 +37,7 @@ const adminNavItems: NavItem[] = [
 const moderatorNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/moderator/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
   { label: 'Guest List', href: '/moderator/guests', icon: <Users className="h-5 w-5" /> },
+  { label: 'Profile', href: '/moderator/profile', icon: <UserCog className="h-5 w-5" /> },
 ];
 
 export function DashboardLayout({ children, role }: DashboardLayoutProps) {
