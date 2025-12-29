@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Loader2, Calendar, Trash2, RotateCcw } from 'lucide-react';
+import { Search, Loader2, Calendar, Trash2, RotateCcw, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   AlertDialog,
@@ -20,6 +20,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface AttendanceRecord {
   id: string;
@@ -31,6 +39,10 @@ interface AttendanceRecord {
     image_url: string | null;
     qr_code: string;
   };
+  scanned_by_profile: {
+    full_name: string | null;
+    email: string;
+  } | null;
 }
 
 export default function AdminAttendance() {
@@ -48,7 +60,7 @@ export default function AdminAttendance() {
 
     const { data, error } = await supabase
       .from('attendance')
-      .select('id, scanned_at, guest:guests(id, name, phone, image_url, qr_code)')
+      .select('id, scanned_at, scanned_by, guest:guests(id, name, phone, image_url, qr_code), scanned_by_profile:profiles!attendance_scanned_by_fkey(full_name, email)')
       .gte('scanned_at', startDate.toISOString())
       .lte('scanned_at', endDate.toISOString())
       .order('scanned_at', { ascending: false });
@@ -59,9 +71,13 @@ export default function AdminAttendance() {
     } else {
       // Filter out null guests and cast properly
       const validRecords = (data || [])
-        .filter((r): r is { id: string; scanned_at: string; guest: { id: string; name: string; phone: string | null; image_url: string | null; qr_code: string } } => 
+        .filter((r): r is { id: string; scanned_at: string; scanned_by: string | null; guest: { id: string; name: string; phone: string | null; image_url: string | null; qr_code: string }; scanned_by_profile: { full_name: string | null; email: string } | null } => 
           r.guest !== null && !Array.isArray(r.guest)
-        );
+        )
+        .map(r => ({
+          ...r,
+          scanned_by_profile: Array.isArray(r.scanned_by_profile) ? r.scanned_by_profile[0] || null : r.scanned_by_profile
+        }));
       setRecords(validRecords);
     }
     setLoading(false);
@@ -114,15 +130,77 @@ export default function AdminAttendance() {
   const filteredRecords = records.filter(r =>
     r.guest.name.toLowerCase().includes(search.toLowerCase()) ||
     r.guest.phone?.includes(search) ||
-    r.guest.qr_code.toLowerCase().includes(search.toLowerCase())
+    r.guest.qr_code.toLowerCase().includes(search.toLowerCase()) ||
+    r.scanned_by_profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    r.scanned_by_profile?.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const downloadCSV = () => {
+    const headers = ['Guest Name', 'Phone', 'QR ID', 'Check-in Time', 'Scanned By'];
+    const rows = filteredRecords.map(r => [
+      r.guest.name,
+      r.guest.phone || '-',
+      r.guest.qr_code,
+      format(new Date(r.scanned_at), 'hh:mm a'),
+      r.scanned_by_profile?.full_name || r.scanned_by_profile?.email || '-'
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Attendance-${dateFilter}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    toast.success('CSV downloaded');
+  };
+
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`Attendance List - ${format(new Date(dateFilter), 'MMM dd, yyyy')}`, 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Total: ${filteredRecords.length} check-ins`, 14, 30);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [['Guest Name', 'Phone', 'QR ID', 'Check-in Time', 'Scanned By']],
+      body: filteredRecords.map(r => [
+        r.guest.name,
+        r.guest.phone || '-',
+        r.guest.qr_code,
+        format(new Date(r.scanned_at), 'hh:mm a'),
+        r.scanned_by_profile?.full_name || r.scanned_by_profile?.email || '-'
+      ]),
+    });
+
+    doc.save(`Attendance-${dateFilter}.pdf`);
+    toast.success('PDF downloaded');
+  };
 
   return (
     <DashboardLayout role="admin">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="font-heading text-2xl font-bold">Attendance List</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" className="w-fit">{filteredRecords.length} check-ins</Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={filteredRecords.length === 0}>
+                <Download className="h-4 w-4 mr-1" /> Download
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={downloadCSV}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={downloadPDF}>
+                <FileText className="h-4 w-4 mr-2" /> PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" disabled={filteredRecords.length === 0}>
@@ -166,14 +244,15 @@ export default function AdminAttendance() {
               <TableHead>Phone</TableHead>
               <TableHead>QR ID</TableHead>
               <TableHead>Check-in Time</TableHead>
+              <TableHead>Scanned By</TableHead>
               <TableHead className="w-[60px]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
             ) : filteredRecords.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No attendance records for this date</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No attendance records for this date</TableCell></TableRow>
             ) : filteredRecords.map((record) => (
               <TableRow key={record.id}>
                 <TableCell>
@@ -191,6 +270,11 @@ export default function AdminAttendance() {
                   <Badge variant="outline" className="font-mono">
                     {format(new Date(record.scanned_at), 'hh:mm a')}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">
+                    {record.scanned_by_profile?.full_name || record.scanned_by_profile?.email || '-'}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <AlertDialog>

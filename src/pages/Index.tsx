@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Keyboard, Scan } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
+  const { user } = useAuth();
   const [scanStatus, setScanStatus] = useState<ScanStatus>(null);
   const [guestData, setGuestData] = useState<GuestData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -58,7 +60,7 @@ const Index = () => {
         // Insert with scan_date to ensure uniqueness at DB level
         const { error: insertError } = await supabase
           .from('attendance')
-          .insert({ guest_id: guest.id, scan_date: today });
+          .insert({ guest_id: guest.id, scan_date: today, scanned_by: user?.id || null });
         
         if (insertError) {
           // If duplicate key error, they were already scanned

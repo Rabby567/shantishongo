@@ -44,6 +44,13 @@ export type Database = {
             referencedRelation: "guests"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attendance_scanned_by_fkey"
+            columns: ["scanned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       guests: {
