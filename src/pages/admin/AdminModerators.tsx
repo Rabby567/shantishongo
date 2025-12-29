@@ -4,15 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Check, X, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { Loader2, Check, X, RefreshCw, Trash2, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Moderator {
   user_id: string;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
@@ -47,7 +49,7 @@ export default function AdminModerators() {
     // Get profiles for these users
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, email, full_name')
+      .select('id, email, full_name, avatar_url')
       .in('id', userIds);
 
     const moderatorList: Moderator[] = approvals.map(approval => {
@@ -56,6 +58,7 @@ export default function AdminModerators() {
         user_id: approval.user_id,
         email: profile?.email || 'Unknown',
         full_name: profile?.full_name || null,
+        avatar_url: profile?.avatar_url || null,
         status: approval.status as 'pending' | 'approved' | 'rejected',
         created_at: approval.created_at,
       };
@@ -178,7 +181,17 @@ export default function AdminModerators() {
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No moderators registered yet</TableCell></TableRow>
             ) : moderators.map((mod) => (
               <TableRow key={mod.user_id}>
-                <TableCell className="font-medium">{mod.full_name || '-'}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={mod.avatar_url || undefined} alt={mod.full_name || 'Moderator'} />
+                      <AvatarFallback>
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{mod.full_name || '-'}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{mod.email}</TableCell>
                 <TableCell>{getStatusBadge(mod.status)}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
