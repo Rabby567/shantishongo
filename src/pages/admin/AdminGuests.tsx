@@ -14,11 +14,19 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { generateQRCodeWithImage, downloadQRCode } from '@/lib/qrcode';
 import { toast } from 'sonner';
-import { Plus, Download, Pencil, Trash2, Search, Loader2, Upload, Archive } from 'lucide-react';
+import { Plus, Download, Pencil, Trash2, Search, Loader2, Upload, Archive, FileText, FileSpreadsheet } from 'lucide-react';
 import JSZip from 'jszip';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Guest {
   id: string;
@@ -225,6 +233,81 @@ export default function AdminGuests() {
     setDownloadingAll(false);
   };
 
+  const downloadGuestsCSV = async () => {
+    try {
+      const { data: allGuests, error } = await supabase
+        .from('guests')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      if (!allGuests || allGuests.length === 0) {
+        toast.error('No guests to download');
+        return;
+      }
+
+      const headers = ['Name', 'Phone', 'QR ID', 'Created At'];
+      const rows = allGuests.map(g => [
+        g.name,
+        g.phone || '-',
+        g.qr_code,
+        new Date(g.created_at).toLocaleDateString()
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Guest-List-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      toast.success('CSV downloaded');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to download CSV');
+    }
+  };
+
+  const downloadGuestsPDF = async () => {
+    try {
+      const { data: allGuests, error } = await supabase
+        .from('guests')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      if (!allGuests || allGuests.length === 0) {
+        toast.error('No guests to download');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Guest List', 14, 22);
+      doc.setFontSize(11);
+      doc.text(`Total: ${allGuests.length} guests`, 14, 30);
+
+      autoTable(doc, {
+        startY: 35,
+        head: [['Name', 'Phone', 'QR ID', 'Created At']],
+        body: allGuests.map(g => [
+          g.name,
+          g.phone || '-',
+          g.qr_code,
+          new Date(g.created_at).toLocaleDateString()
+        ]),
+      });
+
+      doc.save(`Guest-List-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('PDF downloaded');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to download PDF');
+    }
+  };
+
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     if (totalPages <= 7) {
@@ -251,7 +334,22 @@ export default function AdminGuests() {
           <h1 className="font-heading text-2xl font-bold">Guest List</h1>
           <p className="text-sm text-muted-foreground">{totalCount} guest{totalCount !== 1 ? 's' : ''} total</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={totalCount === 0} className="gap-2">
+                <Download className="h-4 w-4" /> Download List
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={downloadGuestsCSV}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={downloadGuestsPDF}>
+                <FileText className="h-4 w-4 mr-2" /> PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={handleDownloadAllQR} disabled={downloadingAll || totalCount === 0} className="gap-2">
             {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
             Download All QR
