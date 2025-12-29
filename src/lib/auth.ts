@@ -6,6 +6,7 @@ export interface AuthUser {
   id: string;
   email: string;
   fullName: string | null;
+  avatarUrl: string | null;
   role: UserRole | null;
   isApproved: boolean;
 }
@@ -86,10 +87,18 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   const role = await getUserRole(user.id);
   const isApproved = role === 'moderator' ? await isModeratorApproved(user.id) : role === 'admin';
   
+  // Fetch profile data including avatar
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', user.id)
+    .maybeSingle();
+  
   return {
     id: user.id,
     email: user.email || '',
-    fullName: user.user_metadata?.full_name || null,
+    fullName: profile?.full_name || user.user_metadata?.full_name || null,
+    avatarUrl: profile?.avatar_url || null,
     role,
     isApproved,
   };

@@ -27,10 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? await isModeratorApproved(supabaseUser.id) 
       : role === 'admin';
     
+    // Fetch profile data including avatar
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url')
+      .eq('id', supabaseUser.id)
+      .maybeSingle();
+    
     return {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
-      fullName: supabaseUser.user_metadata?.full_name || null,
+      fullName: profile?.full_name || supabaseUser.user_metadata?.full_name || null,
+      avatarUrl: profile?.avatar_url || null,
       role,
       isApproved,
     };
