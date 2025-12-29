@@ -17,7 +17,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { generateQRCodeWithImage, downloadQRCode } from '@/lib/qrcode';
 import { toast } from 'sonner';
-import { Plus, Download, Pencil, Trash2, Search, Loader2, Upload } from 'lucide-react';
+import { Plus, Download, Pencil, Trash2, Search, Loader2, Upload, Archive } from 'lucide-react';
+import JSZip from 'jszip';
 
 interface Guest {
   id: string;
@@ -41,6 +42,7 @@ export default function AdminGuests() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -175,6 +177,54 @@ export default function AdminGuests() {
     setDownloadingId(null);
   };
 
+  const handleDownloadAllQR = async () => {
+    setDownloadingAll(true);
+    try {
+      // Fetch all guests (no pagination)
+      const { data: allGuests, error } = await supabase
+        .from('guests')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      if (!allGuests || allGuests.length === 0) {
+        toast.error('No guests to download');
+        setDownloadingAll(false);
+        return;
+      }
+
+      const zip = new JSZip();
+      const toastId = toast.loading(`Generating QR codes... 0/${allGuests.length}`);
+
+      for (let i = 0; i < allGuests.length; i++) {
+        const guest = allGuests[i];
+        toast.loading(`Generating QR codes... ${i + 1}/${allGuests.length}`, { id: toastId });
+        
+        const qrDataUrl = await generateQRCodeWithImage(guest.qr_code, guest.image_url || undefined);
+        const base64Data = qrDataUrl.split(',')[1];
+        const fileName = `QR-${guest.name.replace(/[^a-zA-Z0-9]/g, '-')}-${guest.qr_code}.png`;
+        zip.file(fileName, base64Data, { base64: true });
+      }
+
+      toast.loading('Creating ZIP file...', { id: toastId });
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `All-Guest-QR-Codes-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      toast.success(`Downloaded ${allGuests.length} QR codes`, { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to download QR codes');
+    }
+    setDownloadingAll(false);
+  };
+
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     if (totalPages <= 7) {
@@ -201,7 +251,13 @@ export default function AdminGuests() {
           <h1 className="font-heading text-2xl font-bold">Guest List</h1>
           <p className="text-sm text-muted-foreground">{totalCount} guest{totalCount !== 1 ? 's' : ''} total</p>
         </div>
-        <Button onClick={openAddDialog} className="gap-2"><Plus className="h-4 w-4" />Add Guest</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleDownloadAllQR} disabled={downloadingAll || totalCount === 0} className="gap-2">
+            {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+            Download All QR
+          </Button>
+          <Button onClick={openAddDialog} className="gap-2"><Plus className="h-4 w-4" />Add Guest</Button>
+        </div>
       </div>
 
       <div className="mb-4">
