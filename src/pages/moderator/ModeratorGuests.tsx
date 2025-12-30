@@ -23,7 +23,7 @@ import JSZip from 'jszip';
 interface Guest {
   id: string;
   name: string;
-  phone: string | null;
+  designation: string | null;
   image_url: string | null;
   qr_code: string;
 }
@@ -36,7 +36,7 @@ export default function ModeratorGuests() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', designation: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function ModeratorGuests() {
         .order('created_at', { ascending: false });
 
       if (debouncedSearch.trim()) {
-        query = query.or(`name.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%,qr_code.ilike.%${debouncedSearch}%`);
+        query = query.or(`name.ilike.%${debouncedSearch}%,designation.ilike.%${debouncedSearch}%,qr_code.ilike.%${debouncedSearch}%`);
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -123,7 +123,7 @@ export default function ModeratorGuests() {
     const qrCode = `GUEST-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const { error } = await supabase.from('guests').insert({
       name: formData.name,
-      phone: formData.phone || null,
+      designation: formData.designation || null,
       image_url: imageUrl,
       qr_code: qrCode,
     });
@@ -132,7 +132,7 @@ export default function ModeratorGuests() {
     else {
       toast.success('Guest added successfully');
       setDialogOpen(false);
-      setFormData({ name: '', phone: '' });
+      setFormData({ name: '', designation: '' });
       setImageFile(null);
     }
     setSaving(false);
@@ -243,7 +243,7 @@ export default function ModeratorGuests() {
           <TableHeader>
             <TableRow>
               <TableHead>Guest</TableHead>
-              <TableHead>Phone</TableHead>
+              <TableHead>Designation</TableHead>
               <TableHead>QR ID</TableHead>
               <TableHead className="text-right">Download QR</TableHead>
             </TableRow>
@@ -264,7 +264,7 @@ export default function ModeratorGuests() {
                     <span className="font-medium">{guest.name}</span>
                   </div>
                 </TableCell>
-                <TableCell>{guest.phone || '-'}</TableCell>
+                <TableCell>{guest.designation || '-'}</TableCell>
                 <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{guest.qr_code}</code></TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => handleDownloadQR(guest)} disabled={downloadingId === guest.id}>
@@ -326,8 +326,8 @@ export default function ModeratorGuests() {
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Guest name" />
             </div>
             <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="Phone number" />
+              <Label>Designation</Label>
+              <Input value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} placeholder="e.g. Manager, VIP, Speaker" />
             </div>
             <div className="space-y-2">
               <Label>Photo</Label>

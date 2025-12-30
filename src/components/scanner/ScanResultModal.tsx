@@ -10,6 +10,7 @@ export interface GuestData {
   name: string;
   qr_code: string;
   image_url?: string | null;
+  designation?: string | null;
 }
 
 interface ScanResultModalProps {
@@ -68,9 +69,14 @@ export function ScanResultModal({ status, guest, onClose }: ScanResultModalProps
                 </AvatarFallback>
               </Avatar>
               
-              <div className="text-center space-y-1">
+              <div className="text-center space-y-2">
                 <p className="text-xl font-semibold text-foreground">{guest.name}</p>
-                <p className="text-sm text-muted-foreground font-mono bg-background px-3 py-1 rounded-full">
+                {guest.designation && (
+                  <p className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+                    {guest.designation}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground font-mono bg-background px-3 py-1 rounded-full">
                   {guest.qr_code}
                 </p>
               </div>

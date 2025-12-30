@@ -57,30 +57,30 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          designation: string | null
           id: string
           image_url: string | null
           name: string
-          phone: string | null
           qr_code: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          designation?: string | null
           id?: string
           image_url?: string | null
           name: string
-          phone?: string | null
           qr_code: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          designation?: string | null
           id?: string
           image_url?: string | null
           name?: string
-          phone?: string | null
           qr_code?: string
           updated_at?: string
         }
