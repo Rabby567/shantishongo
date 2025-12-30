@@ -19,7 +19,7 @@ interface AttendanceRecord {
   id: string;
   scan_date: string;
   scanned_at: string;
-  guest: { name: string; phone: string | null; image_url: string | null } | null;
+  guest: { name: string; designation: string | null; image_url: string | null } | null;
 }
 
 export default function ModeratorDashboard() {
@@ -36,7 +36,7 @@ export default function ModeratorDashboard() {
     // Fetch attendance records with guest info
     const { data: attendance } = await supabase
       .from('attendance')
-      .select('id, scan_date, scanned_at, guest:guests(name, phone, image_url)')
+      .select('id, scan_date, scanned_at, guest:guests(name, designation, image_url)')
       .order('scanned_at', { ascending: false })
       .limit(50);
     
@@ -98,7 +98,7 @@ export default function ModeratorDashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Guest Name</TableHead>
-                <TableHead>Phone</TableHead>
+                <TableHead>Designation</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Time</TableHead>
               </TableRow>
@@ -124,7 +124,7 @@ export default function ModeratorDashboard() {
                         <span className="font-medium">{record.guest?.name || 'Unknown'}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{record.guest?.phone || '-'}</TableCell>
+                    <TableCell>{record.guest?.designation || '-'}</TableCell>
                     <TableCell>{format(new Date(record.scan_date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>{format(new Date(record.scanned_at), 'h:mm a')}</TableCell>
                   </TableRow>

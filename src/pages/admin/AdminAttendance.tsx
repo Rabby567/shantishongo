@@ -35,7 +35,7 @@ interface AttendanceRecord {
   guest: {
     id: string;
     name: string;
-    phone: string | null;
+    designation: string | null;
     image_url: string | null;
     qr_code: string;
   };
@@ -60,7 +60,7 @@ export default function AdminAttendance() {
 
     const { data, error } = await supabase
       .from('attendance')
-      .select('id, scanned_at, scanned_by, guest:guests(id, name, phone, image_url, qr_code), scanned_by_profile:profiles!attendance_scanned_by_fkey(full_name, email)')
+      .select('id, scanned_at, scanned_by, guest:guests(id, name, designation, image_url, qr_code), scanned_by_profile:profiles!attendance_scanned_by_fkey(full_name, email)')
       .gte('scanned_at', startDate.toISOString())
       .lte('scanned_at', endDate.toISOString())
       .order('scanned_at', { ascending: false });
@@ -71,7 +71,7 @@ export default function AdminAttendance() {
     } else {
       // Filter out null guests and cast properly
       const validRecords = (data || [])
-        .filter((r): r is { id: string; scanned_at: string; scanned_by: string | null; guest: { id: string; name: string; phone: string | null; image_url: string | null; qr_code: string }; scanned_by_profile: { full_name: string | null; email: string } | null } => 
+        .filter((r): r is { id: string; scanned_at: string; scanned_by: string | null; guest: { id: string; name: string; designation: string | null; image_url: string | null; qr_code: string }; scanned_by_profile: { full_name: string | null; email: string } | null } => 
           r.guest !== null && !Array.isArray(r.guest)
         )
         .map(r => ({
@@ -129,17 +129,17 @@ export default function AdminAttendance() {
 
   const filteredRecords = records.filter(r =>
     r.guest.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.guest.phone?.includes(search) ||
+    r.guest.designation?.toLowerCase().includes(search.toLowerCase()) ||
     r.guest.qr_code.toLowerCase().includes(search.toLowerCase()) ||
     r.scanned_by_profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     r.scanned_by_profile?.email.toLowerCase().includes(search.toLowerCase())
   );
 
   const downloadCSV = () => {
-    const headers = ['Guest Name', 'Phone', 'QR ID', 'Check-in Time', 'Scanned By'];
+    const headers = ['Guest Name', 'Designation', 'QR ID', 'Check-in Time', 'Scanned By'];
     const rows = filteredRecords.map(r => [
       r.guest.name,
-      r.guest.phone || '-',
+      r.guest.designation || '-',
       r.guest.qr_code,
       format(new Date(r.scanned_at), 'hh:mm a'),
       r.scanned_by_profile?.full_name || r.scanned_by_profile?.email || '-'
@@ -166,10 +166,10 @@ export default function AdminAttendance() {
 
     autoTable(doc, {
       startY: 35,
-      head: [['Guest Name', 'Phone', 'QR ID', 'Check-in Time', 'Scanned By']],
+      head: [['Guest Name', 'Designation', 'QR ID', 'Check-in Time', 'Scanned By']],
       body: filteredRecords.map(r => [
         r.guest.name,
-        r.guest.phone || '-',
+        r.guest.designation || '-',
         r.guest.qr_code,
         format(new Date(r.scanned_at), 'hh:mm a'),
         r.scanned_by_profile?.full_name || r.scanned_by_profile?.email || '-'
@@ -241,7 +241,7 @@ export default function AdminAttendance() {
           <TableHeader>
             <TableRow>
               <TableHead>Guest</TableHead>
-              <TableHead>Phone</TableHead>
+              <TableHead>Designation</TableHead>
               <TableHead>QR ID</TableHead>
               <TableHead>Check-in Time</TableHead>
               <TableHead>Scanned By</TableHead>
@@ -264,7 +264,7 @@ export default function AdminAttendance() {
                     <span className="font-medium">{record.guest.name}</span>
                   </div>
                 </TableCell>
-                <TableCell>{record.guest.phone || '-'}</TableCell>
+                <TableCell>{record.guest.designation || '-'}</TableCell>
                 <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{record.guest.qr_code}</code></TableCell>
                 <TableCell>
                   <Badge variant="outline" className="font-mono">

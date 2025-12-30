@@ -57,7 +57,7 @@ const Index = () => {
     try {
       const { data: guest, error: guestError } = await supabase
         .from('guests')
-        .select('id, name, qr_code, image_url')
+        .select('id, name, qr_code, image_url, designation')
         .eq('qr_code', qrCode)
         .maybeSingle();
 
@@ -87,6 +87,7 @@ const Index = () => {
         name: guest.name,
         qr_code: guest.qr_code,
         image_url: guest.image_url,
+        designation: guest.designation,
       });
 
       if (existingAttendance) {

@@ -31,7 +31,7 @@ import autoTable from 'jspdf-autotable';
 interface Guest {
   id: string;
   name: string;
-  phone: string | null;
+  designation: string | null;
   image_url: string | null;
   qr_code: string;
   created_at: string;
@@ -46,7 +46,7 @@ export default function AdminGuests() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
-  const [formData, setFormData] = useState({ name: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', designation: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export default function AdminGuests() {
         .order('created_at', { ascending: false });
 
       if (debouncedSearch.trim()) {
-        query = query.or(`name.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%,qr_code.ilike.%${debouncedSearch}%`);
+        query = query.or(`name.ilike.%${debouncedSearch}%,designation.ilike.%${debouncedSearch}%,qr_code.ilike.%${debouncedSearch}%`);
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -110,14 +110,14 @@ export default function AdminGuests() {
 
   const openAddDialog = () => {
     setEditingGuest(null);
-    setFormData({ name: '', phone: '' });
+    setFormData({ name: '', designation: '' });
     setImageFile(null);
     setDialogOpen(true);
   };
 
   const openEditDialog = (guest: Guest) => {
     setEditingGuest(guest);
-    setFormData({ name: guest.name, phone: guest.phone || '' });
+    setFormData({ name: guest.name, designation: guest.designation || '' });
     setImageFile(null);
     setDialogOpen(true);
   };
@@ -147,7 +147,7 @@ export default function AdminGuests() {
     if (editingGuest) {
       const { error } = await supabase.from('guests').update({
         name: formData.name,
-        phone: formData.phone || null,
+        designation: formData.designation || null,
         image_url: imageUrl,
       }).eq('id', editingGuest.id);
       if (error) toast.error('Failed to update guest');
@@ -156,7 +156,7 @@ export default function AdminGuests() {
       const qrCode = `GUEST-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
       const { error } = await supabase.from('guests').insert({
         name: formData.name,
-        phone: formData.phone || null,
+        designation: formData.designation || null,
         image_url: imageUrl,
         qr_code: qrCode,
       });
@@ -246,10 +246,10 @@ export default function AdminGuests() {
         return;
       }
 
-      const headers = ['Name', 'Phone', 'QR ID', 'Created At'];
+      const headers = ['Name', 'Designation', 'QR ID', 'Created At'];
       const rows = allGuests.map(g => [
         g.name,
-        g.phone || '-',
+        g.designation || '-',
         g.qr_code,
         new Date(g.created_at).toLocaleDateString()
       ]);
@@ -291,10 +291,10 @@ export default function AdminGuests() {
 
       autoTable(doc, {
         startY: 35,
-        head: [['Name', 'Phone', 'QR ID', 'Created At']],
+        head: [['Name', 'Designation', 'QR ID', 'Created At']],
         body: allGuests.map(g => [
           g.name,
-          g.phone || '-',
+          g.designation || '-',
           g.qr_code,
           new Date(g.created_at).toLocaleDateString()
         ]),
@@ -370,7 +370,7 @@ export default function AdminGuests() {
           <TableHeader>
             <TableRow>
               <TableHead>Guest</TableHead>
-              <TableHead>Phone</TableHead>
+              <TableHead>Designation</TableHead>
               <TableHead>QR ID</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -391,7 +391,7 @@ export default function AdminGuests() {
                     <span className="font-medium">{guest.name}</span>
                   </div>
                 </TableCell>
-                <TableCell>{guest.phone || '-'}</TableCell>
+                <TableCell>{guest.designation || '-'}</TableCell>
                 <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{guest.qr_code}</code></TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
@@ -457,8 +457,8 @@ export default function AdminGuests() {
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Guest name" />
             </div>
             <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="Phone number" />
+              <Label>Designation</Label>
+              <Input value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} placeholder="e.g. Manager, VIP, Speaker" />
             </div>
             <div className="space-y-2">
               <Label>Photo</Label>
